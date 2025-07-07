@@ -1,107 +1,174 @@
-// C:\Users\sptzk\Desktop\t0703\lib\features\auth\viewmodel\auth_viewmodel.dart
+// lib/features/auth/viewmodel/auth_viewmodel.dart
 
-import 'dart:convert';
-import 'package:flutter/foundation.dart'; // kIsWeb을 위해 필요
+import 'package:flutter/material.dart';
+import 'package:t0703/features/auth/model/user.dart';
 import 'package:http/http.dart' as http;
-import '../model/user.dart';
+import 'dart:convert';
 
-class AuthViewModel with ChangeNotifier {
-  // ✅ 생성자를 통해 주입받도록 변경 (final 키워드 유지)
-  final String _baseUrl; 
+class AuthViewModel extends ChangeNotifier {
+  User? _currentUser;
+  bool _isLoading = false;
+  String? _errorMessage;
+  final String baseUrl;
 
-  // ✅ 생성자 추가: baseUrl을 필수 매개변수로 받습니다.
-  AuthViewModel({required String baseUrl}) : _baseUrl = baseUrl;
+  AuthViewModel({required this.baseUrl});
 
-  Future<bool?> checkUserIdDuplicate(String userId) async {
+  User? get currentUser => _currentUser;
+  bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
+
+  void _setLoading(bool value) {
+    _isLoading = value;
+    notifyListeners();
+  }
+
+  void _setErrorMessage(String? message) {
+    _errorMessage = message;
+    notifyListeners();
+  }
+
+  // 사용자 로그인
+  Future<bool> login(String email, String password) async {
+    _setLoading(true);
+    _setErrorMessage(null);
+
     try {
-      final res = await http.get(Uri.parse('$_baseUrl/auth/exists?user_id=$userId'));
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        return data['exists'] == true;
-      } else {
-        if (kDebugMode) {
-          print('ID 중복검사 서버 응답 오류: StatusCode=${res.statusCode}, Body=${res.body}');
+      final response = await http.post(
+        Uri.parse('$baseUrl/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'email': email, 'password': password}),
+      );
+
+      print('Login API Status Code: ${response.statusCode}');
+      print('Login API Response Body: ${response.body}'); // 디버깅을 위해 추가
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        // 백엔드 응답이 {'user': {...}} 형태인지, 아니면 {...} 형태인지 확인 필요
+        // 현재는 {'user': {...}} 형태를 가정합니다.
+        if (data['user'] != null) {
+          _currentUser = User.fromJson(data['user']);
+          print('Parsed User Data: ${_currentUser?.toJson()}'); // 디버깅을 위해 추가
+          _setLoading(false);
+          return true;
+        } else {
+          _setErrorMessage('로그인 응답에 사용자 정보가 없습니다.');
+          _setLoading(false);
+          return false;
         }
-        return null;
+      } else {
+        _setErrorMessage('로그인 실패: ${response.body}');
+        _setLoading(false);
+        return false;
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('ID 중복검사 중 네트워크 오류: $e');
-      }
-      return null;
+      _setErrorMessage('네트워크 오류 또는 서버 응답 문제: $e');
+      _setLoading(false);
+      return false;
     }
   }
 
-  Future<String?> registerUser(Map<String, String> userData) async {
+  // 사용자 회원가입
+  Future<String?> register(String email, String password, String name, bool isDoctor) async {
+    _setLoading(true);
+    _setErrorMessage(null);
+
     try {
-      final res = await http.post(
-        Uri.parse('$_baseUrl/auth/register'),
+      final response = await http.post(
+        Uri.parse('$baseUrl/register'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(userData),
+        body: json.encode({
+          'email': email,
+          'password': password,
+          'name': name,
+          'is_doctor': isDoctor, // 백엔드와 일치하도록 'is_doctor' 사용
+        }),
       );
 
-      if (res.statusCode == 201) {
-        return null;
+      print('Register API Status Code: ${response.statusCode}');
+      print('Register API Response Body: ${response.body}'); // 디버깅을 위해 추가
+
+
+      if (response.statusCode == 201) {
+        _setLoading(false);
+        return null; // 성공
       } else {
-        final data = jsonDecode(res.body);
-        return data['error'] ?? '알 수 없는 오류가 발생했습니다.';
+        final errorMsg = json.decode(response.body)['message'] ?? '회원가입 실패';
+        _setErrorMessage(errorMsg);
+        _setLoading(false);
+        return errorMsg;
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('회원가입 중 네트워크 오류: $e');
-      }
-      return '서버와 연결할 수 없습니다. 네트워크 상태를 확인해주세요.';
+      _setErrorMessage('네트워크 오류 또는 서버 응답 문제: $e');
+      _setLoading(false);
+      return e.toString();
     }
   }
 
-  /// 사용자 로그인
-  /// 반환값: User 객체 (로그인 성공), String (오류 메시지)
-  Future<User?> loginUser(String userId, String password) async {
+  // 이메일 중복 확인 (새로 추가)
+  Future<bool> checkEmailDuplicate(String email) async {
+    _setLoading(true);
+    _setErrorMessage(null);
     try {
-      final res = await http.post(
-        Uri.parse('$_baseUrl/auth/login'),
+      final response = await http.post(
+        Uri.parse('$baseUrl/check_email_duplicate'), // 백엔드 중복 확인 엔드포인트
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'user_id': userId, 'password': password}),
+        body: json.encode({'email': email}),
       );
 
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        return User.fromJson(data['user']);
+      print('Duplicate Check API Status Code: ${response.statusCode}');
+      print('Duplicate Check API Response Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['exists'] as bool; // 백엔드 응답에 'exists': true/false가 있다고 가정
       } else {
-        final data = jsonDecode(res.body);
-        throw data['error'] ?? '알 수 없는 로그인 오류';
+        _setErrorMessage('이메일 중복 확인 실패: ${response.body}');
+        return true; // 오류 발생 시 중복으로 간주하여 회원가입 진행 방지
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('로그인 중 네트워크 오류: $e');
-      }
-      if (e is String) {
-        throw e;
-      } else {
-        throw '서버와 연결할 수 없습니다. 네트워크 상태를 확인해주세요.';
-      }
+      _setErrorMessage('네트워크 오류 또는 서버 응답 문제: $e');
+      return true; // 네트워크 오류 시 중복으로 간주
+    } finally {
+      _setLoading(false);
+      notifyListeners();
     }
   }
 
-  Future<String?> deleteUser(String userId, String password) async {
+
+  // 사용자 계정 삭제
+  Future<String?> deleteUser(String email, String password) async {
+    _setLoading(true);
+    _setErrorMessage(null);
+
     try {
-      final res = await http.delete(
-        Uri.parse('$_baseUrl/auth/delete_account'),
+      final response = await http.post(
+        Uri.parse('$baseUrl/delete_account'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'user_id': userId, 'password': password}),
+        body: json.encode({'email': email, 'password': password}),
       );
 
-      if (res.statusCode == 200) {
-        return null;
+      if (response.statusCode == 200) {
+        _currentUser = null; // 계정 삭제 성공 시 현재 사용자 정보 초기화
+        _setLoading(false);
+        return null; // 성공
       } else {
-        final data = jsonDecode(res.body);
-        return data['error'] ?? '회원 탈퇴 중 알 수 없는 오류가 발생했습니다.';
+        final errorMsg = json.decode(response.body)['message'] ?? '계정 삭제 실패';
+        _setErrorMessage(errorMsg);
+        _setLoading(false);
+        return errorMsg;
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('회원 탈퇴 중 네트워크 오류: $e');
-      }
-      return '서버와 연결할 수 없습니다. 네트워크 상태를 확인해주세요.';
+      _setErrorMessage('네트워크 오류 또는 서버 응답 문제: $e');
+      _setLoading(false);
+      return e.toString();
     }
+  }
+
+  // 로그아웃
+  void logout() {
+    _currentUser = null;
+    _setErrorMessage(null);
+    notifyListeners();
   }
 }

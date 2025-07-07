@@ -1,11 +1,10 @@
-// C:\Users\sptzk\Desktop\t0703\lib\features\mypage\view\edit_profile_screen.dart
+// lib/features/mypage/view/edit_profile_screen.dart
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // TextInputFormatter를 위해 필요
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../../auth/model/user.dart'; // User 모델 임포트
-import '../viewmodel/userinfo_viewmodel.dart';
+import 'package:t0703/features/mypage/viewmodel/userinfo_viewmodel.dart';
+import 'package:t0703/features/auth/model/user.dart'; // User 모델 임포트
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -17,21 +16,20 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
-  late String _selectedGender;
   late TextEditingController _birthController;
   late TextEditingController _phoneController;
-  late TextEditingController _userIdController;
+  late TextEditingController _emailController; // userId 대신 email 사용
+  String? _selectedGender;
 
   @override
   void initState() {
     super.initState();
     final user = context.read<UserInfoViewModel>().user;
-
     _nameController = TextEditingController(text: user?.name ?? '');
     _selectedGender = user?.gender ?? 'M';
     _birthController = TextEditingController(text: user?.birth ?? '');
     _phoneController = TextEditingController(text: user?.phone ?? '');
-    _userIdController = TextEditingController(text: user?.userId ?? '');
+    _emailController = TextEditingController(text: user?.email ?? ''); // user.email 사용
   }
 
   @override
@@ -39,7 +37,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameController.dispose();
     _birthController.dispose();
     _phoneController.dispose();
-    _userIdController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 
@@ -51,212 +49,235 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         margin: const EdgeInsets.all(15),
+        backgroundColor: Colors.blueGrey[700],
       ),
     );
   }
 
-  void _saveChanges() {
-    if (_formKey.currentState!.validate()) {
-      _showSnack('개인정보가 저장되었습니다. (실제 저장 로직은 미구현)');
-      context.pop(); // 저장 후 이전 화면 (마이페이지)으로 돌아가기
-    } else {
-      _showSnack('입력된 정보를 확인해주세요.');
+  Future<void> _updateProfile() async {
+    if (!_formKey.currentState!.validate()) {
+      _showSnack('모든 필드를 올바르게 입력해주세요.');
+      return;
+    }
+
+    final userInfoViewModel = context.read<UserInfoViewModel>();
+
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext dialogContext) {
+          return const Center(child: CircularProgressIndicator(color: Colors.blueAccent));
+        },
+      );
+
+      final success = await userInfoViewModel.updateProfile(
+        name: _nameController.text.trim(),
+        gender: _selectedGender,
+        birth: _birthController.text.trim(),
+        phone: _phoneController.text.trim(),
+      );
+
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+
+      if (success) {
+        _showSnack('프로필이 성공적으로 업데이트되었습니다!');
+        context.pop(); // 이전 화면으로 돌아가기
+      } else {
+        _showSnack(userInfoViewModel.errorMessage ?? '프로필 업데이트 실패');
+      }
+    } catch (e) {
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      _showSnack('프로필 업데이트 중 오류 발생: ${e.toString()}');
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final user = context.watch<UserInfoViewModel>().user;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('개인정보 수정'),
+        title: const Text(
+          '프로필 수정',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+        ),
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(), // 이전 화면 (마이페이지)으로 돌아가기
-        ),
+        backgroundColor: Colors.white,
+        elevation: 0.5,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          autovalidateMode: AutovalidateMode.onUserInteraction,
-          child: ListView(
-            children: [
-              _buildTextField(
-                _nameController,
-                '이름 (한글만)',
-                keyboardType: TextInputType.name,
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^[가-힣]*$')),
-                ],
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) return '이름을 입력해주세요';
-                  if (!RegExp(r'^[가-힣]+$').hasMatch(value)) return '이름은 한글만 입력 가능합니다';
-                  return null;
-                },
-              ),
-              _buildGenderSelector(),
-              _buildTextField(
-                _birthController,
-                '생년월일 (YYYY-MM-DD)',
-                maxLength: 10,
-                keyboardType: TextInputType.number,
-                inputFormatters: [DateInputFormatter()],
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) return '생년월일을 입력해주세요';
-                  final RegExp dateRegex = RegExp(r'^\d{4}-\d{2}-\d{2}$');
-                  if (!dateRegex.hasMatch(value)) return '올바른 생년월일 형식(YYYY-MM-DD)으로 입력하세요';
-                  try {
-                    final DateTime birthDate = DateTime.parse(value);
-                    final DateTime now = DateTime.now();
-                    if (birthDate.isAfter(now)) return '생년월일은 오늘 날짜를 넘을 수 없습니다';
-                  } catch (e) {
-                    return '유효하지 않은 날짜입니다 (예: 2023-02-30)';
-                  }
-                  return null;
-                },
-              ),
-              _buildTextField(
-                _phoneController,
-                '전화번호 (숫자만)',
-                maxLength: 11,
-                keyboardType: TextInputType.phone,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) return '전화번호를 입력해주세요';
-                  if (!RegExp(r'^\d{10,11}$').hasMatch(value)) return '유효한 전화번호를 입력하세요 (숫자 10-11자리)';
-                  return null;
-                },
-              ),
-              _buildTextField(
-                _userIdController,
-                '아이디',
-                readOnly: true,
-                decoration: const InputDecoration(
-                  labelText: '아이디',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(10)),
-                    borderSide: BorderSide(color: Colors.grey),
+      body: Container(
+        color: Colors.grey[50],
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formKey,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSectionTitle('기본 정보'),
+                _buildTextFormField(
+                  controller: _nameController,
+                  labelText: '이름',
+                  icon: Icons.person_outline,
+                  validator: (value) => value!.isEmpty ? '이름을 입력해주세요.' : null,
+                ),
+                const SizedBox(height: 20),
+                _buildGenderSelection(),
+                const SizedBox(height: 20),
+                _buildTextFormField(
+                  controller: _birthController,
+                  labelText: '생년월일 (YYYY-MM-DD)',
+                  icon: Icons.calendar_today_outlined,
+                  keyboardType: TextInputType.datetime,
+                  validator: (value) {
+                    if (value!.isEmpty) return '생년월일을 입력해주세요.';
+                    if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value)) {
+                      return '유효한 날짜 형식(YYYY-MM-DD)을 입력해주세요.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 20),
+                _buildTextFormField(
+                  controller: _phoneController,
+                  labelText: '전화번호',
+                  icon: Icons.phone_outlined,
+                  keyboardType: TextInputType.phone,
+                  validator: (value) => value!.isEmpty ? '전화번호를 입력해주세요.' : null,
+                ),
+                const SizedBox(height: 30),
+                _buildSectionTitle('계정 정보'),
+                _buildTextFormField(
+                  controller: _emailController,
+                  labelText: '아이디 (이메일)',
+                  icon: Icons.email_outlined,
+                  readOnly: true, // 이메일은 수정 불가
+                  validator: (value) => null, // 읽기 전용이므로 유효성 검사 필요 없음
+                ),
+                const SizedBox(height: 40),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _updateProfile,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 3,
+                    ),
+                    child: Text(
+                      '프로필 업데이트',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
                   ),
-                  filled: true,
-                  fillColor: Colors.grey,
                 ),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _saveChanges,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  backgroundColor: Colors.blueAccent,
-                ),
-                child: const Text('변경 사항 저장', style: TextStyle(fontSize: 18, color: Colors.white)),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildTextField(
-    TextEditingController controller,
-    String label, {
-    bool isPassword = false,
-    int? maxLength,
-    int? minLength,
-    TextInputType? keyboardType,
-    ValueChanged<String>? onChanged,
-    List<TextInputFormatter>? inputFormatters,
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 15.0),
+      child: Text(
+        title,
+        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: Colors.blueAccent,
+            ),
+      ),
+    );
+  }
+
+  Widget _buildTextFormField({
+    required TextEditingController controller,
+    required String labelText,
+    required IconData icon,
+    TextInputType keyboardType = TextInputType.text,
+    bool obscureText = false,
     bool readOnly = false,
-    InputDecoration? decoration,
-    FormFieldValidator<String>? validator,
+    String? Function(String?)? validator,
   }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: TextFormField(
-        controller: controller,
-        obscureText: isPassword,
-        maxLength: maxLength,
-        keyboardType: keyboardType,
-        onChanged: onChanged,
-        inputFormatters: inputFormatters,
-        readOnly: readOnly,
-        decoration: decoration ?? InputDecoration(
-          labelText: label,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: Colors.grey),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: Colors.blueAccent, width: 2),
-          ),
-          counterText: '',
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      obscureText: obscureText,
+      readOnly: readOnly,
+      style: const TextStyle(color: Colors.black87),
+      decoration: InputDecoration(
+        labelText: labelText,
+        prefixIcon: Icon(icon, color: Colors.grey[600]),
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
         ),
-        validator: validator,
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.blueAccent, width: 2),
+        ),
+        errorStyle: const TextStyle(color: Colors.redAccent),
       ),
+      validator: validator,
     );
   }
 
-  Widget _buildGenderSelector() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          const Text('성별', style: TextStyle(fontSize: 16)),
-          const SizedBox(width: 16),
-          Expanded(
-            child: RadioListTile<String>(
-              title: const Text('남'),
-              value: 'M',
-              groupValue: _selectedGender,
-              onChanged: (value) => setState(() => _selectedGender = value!),
+  Widget _buildGenderSelection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 12.0, bottom: 8.0),
+          child: Text(
+            '성별',
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 16,
             ),
           ),
-          Expanded(
-            child: RadioListTile<String>(
-              title: const Text('여'),
-              value: 'F',
-              groupValue: _selectedGender,
-              onChanged: (value) => setState(() => _selectedGender = value!),
-            ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade300),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class DateInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    final text = newValue.text.replaceAll(RegExp(r'\D'), '');
-    String newText = '';
-
-    if (text.isEmpty) {
-      return newValue.copyWith(text: '');
-    }
-
-    for (int i = 0; i < text.length; i++) {
-      if (i == 4 || i == 6) {
-        if (text.length > i) {
-          newText += '-';
-        }
-      }
-      newText += text[i];
-    }
-
-    if (newText.length > 10) {
-      newText = newText.substring(0, 10);
-    }
-
-    return newValue.copyWith(
-      text: newText,
-      selection: TextSelection.collapsed(offset: newText.length),
+          child: DropdownButtonFormField<String>(
+            value: _selectedGender,
+            decoration: const InputDecoration(
+              border: InputBorder.none, // DropdownButtonFormField 자체의 border 제거
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+            items: const [
+              DropdownMenuItem(value: 'M', child: Text('남성')),
+              DropdownMenuItem(value: 'F', child: Text('여성')),
+              DropdownMenuItem(value: 'O', child: Text('기타')),
+            ],
+            onChanged: (value) {
+              setState(() {
+                _selectedGender = value;
+              });
+            },
+            validator: (value) => value == null ? '성별을 선택해주세요.' : null,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -1,22 +1,58 @@
-// C:\Users\sptzk\Desktop\t0703\lib\features\mypage\viewmodel\userinfo_viewmodel.dart
+// lib/features/mypage/viewmodel/userinfo_viewmodel.dart
 
 import 'package:flutter/material.dart';
-import '../../auth/model/user.dart'; // User 모델 임포트
+import 'package:t0703/features/auth/model/user.dart';
 
 class UserInfoViewModel extends ChangeNotifier {
-  User? _user; // 현재 로그인된 사용자 정보
+  User? _user;
+  bool _isLoading = false;
+  String? _errorMessage;
 
-  User? get user => _user; // 사용자 정보 getter
+  UserInfoViewModel();
 
-  // 사용자 정보를 로드 (로그인 성공 시 호출)
+  User? get user => _user;
+  bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage; // errorMessage getter 추가
+
   void loadUser(User user) {
     _user = user;
-    notifyListeners(); // UI 업데이트 알림
+    notifyListeners();
   }
 
-  // 사용자 정보를 지움 (로그아웃 또는 회원 탈퇴 시 호출)
-  void clearUser() { // 함수명 변경: clear -> clearUser
-    _user = null;
-    notifyListeners(); // UI 업데이트 알림
+  // 사용자 정보 업데이트 메서드
+  Future<bool> updateProfile({
+    String? name,
+    String? gender,
+    String? birth,
+    String? phone,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      // 실제 API 호출 로직 (백엔드로 업데이트된 정보 전송)
+      // 예: await ApiService().updateUserProfile(_user!.uid, name, gender, birth, phone);
+      await Future.delayed(const Duration(seconds: 1)); // 시뮬레이션
+
+      if (_user != null) {
+        _user = User(
+          uid: _user!.uid,
+          email: _user!.email,
+          name: name ?? _user!.name,
+          isDoctor: _user!.isDoctor,
+          gender: gender ?? _user!.gender,
+          birth: birth ?? _user!.birth,
+          phone: phone ?? _user!.phone,
+        );
+      }
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 }

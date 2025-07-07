@@ -1,10 +1,10 @@
-// C:\Users\sptzk\Desktop\t0703\lib\features\auth\view\login_screen.dart
+// lib/features/auth/view/login_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../viewmodel/auth_viewmodel.dart';
-import '../../mypage/viewmodel/userinfo_viewmodel.dart';
+import 'package:t0703/features/auth/viewmodel/auth_viewmodel.dart';
+import 'package:t0703/features/mypage/viewmodel/userinfo_viewmodel.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -15,16 +15,17 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _userIdController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
   @override
   void dispose() {
-    _userIdController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
+  // 스낵바 메시지 표시 함수
   void _showSnack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -38,19 +39,21 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  // 로그인 처리 함수
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) {
       _showSnack('아이디와 비밀번호를 모두 입력해주세요.');
       return;
     }
 
-    final userId = _userIdController.text.trim();
+    final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
     final authViewModel = context.read<AuthViewModel>();
     final userInfoViewModel = context.read<UserInfoViewModel>();
 
     try {
+      // 로딩 인디케이터 표시
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -59,20 +62,34 @@ class _LoginScreenState extends State<LoginScreen> {
         },
       );
 
-      final user = await authViewModel.loginUser(userId, password);
+      // ⭐ authViewModel.loginUser 대신 authViewModel.login 호출
+      final success = await authViewModel.login(email, password);
+      final user = authViewModel.currentUser; // 로그인 성공 시 현재 사용자 정보 가져오기
 
-      Navigator.of(context).pop();
-
-      if (user != null) {
-        userInfoViewModel.loadUser(user);
-        _showSnack('로그인 성공!');
-        context.go('/home');
-      }
-    } catch (e) {
+      // 로딩 인디케이터 숨기기
       if (Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }
-      _showSnack(e.toString());
+
+      if (success && user != null) { // 로그인 성공 여부와 사용자 객체 존재 여부 확인
+        userInfoViewModel.loadUser(user); // 로그인 성공 시 사용자 정보 로드
+        _showSnack('로그인 성공!');
+
+        // 사용자 유형에 따라 다른 화면으로 이동
+        if (user.isDoctor) {
+          context.go('/doctor-dashboard'); // 의사 대시보드 (라우터 경로 확인)
+        } else {
+          context.go('/home'); // 환자 홈 화면 (라우터 경로 확인)
+        }
+      } else {
+        _showSnack(authViewModel.errorMessage ?? '로그인 실패: 알 수 없는 오류');
+      }
+    } catch (e) {
+      // 로딩 인디케이터 숨기기
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      _showSnack('로그인 중 예기치 않은 오류가 발생했습니다: ${e.toString()}');
     }
   }
 
@@ -80,16 +97,10 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          '로그인',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 0.5,
+        title: const Text('로그인'),
       ),
       body: Container(
-        color: Colors.grey[50],
+        color: Theme.of(context).scaffoldBackgroundColor,
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
@@ -102,7 +113,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   Icon(
                     Icons.lock_open_rounded,
                     size: 80,
-                    color: Colors.blue.shade700,
+                    color: Theme.of(context).primaryColor,
                   ),
                   const SizedBox(height: 20),
                   Text(
@@ -114,30 +125,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 40),
                   TextFormField(
-                    controller: _userIdController,
+                    controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
-                    style: const TextStyle(color: Colors.black87),
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       labelText: '아이디 (이메일)',
-                      labelStyle: TextStyle(color: Colors.grey[600]),
                       hintText: 'example@example.com',
-                      hintStyle: TextStyle(color: Colors.grey[400]),
-                      prefixIcon: Icon(Icons.person_outline, color: Colors.grey[600]),
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.blueAccent, width: 2),
-                      ),
-                      errorStyle: const TextStyle(color: Colors.redAccent),
+                      prefixIcon: Icon(Icons.person_outline),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return '아이디를 입력해주세요';
+                        return '이메일을 입력해주세요';
                       }
                       return null;
                     },
@@ -146,24 +143,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextFormField(
                     controller: _passwordController,
                     obscureText: true,
-                    style: const TextStyle(color: Colors.black87),
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       labelText: '비밀번호',
-                      labelStyle: TextStyle(color: Colors.grey[600]),
                       hintText: '비밀번호를 입력해주세요',
-                      hintStyle: TextStyle(color: Colors.grey[400]),
-                      prefixIcon: Icon(Icons.lock_outline, color: Colors.grey[600]),
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.blueAccent, width: 2),
-                      ),
-                      errorStyle: const TextStyle(color: Colors.redAccent),
+                      prefixIcon: Icon(Icons.lock_outline),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -177,22 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: _login,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blueAccent,
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 3,
-                        shadowColor: Colors.blueAccent.withOpacity(0.3),
-                      ),
-                      child: Text(
-                        '로그인',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
+                      child: const Text('로그인'),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -214,12 +182,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  // 아이디/비밀번호 찾기 하나의 버튼
                   TextButton(
                     onPressed: () => context.go('/find-account'),
-                    child: const Text(
+                    child: Text(
                       '아이디/비밀번호 찾기',
-                      style: TextStyle(color: Colors.blueAccent),
+                      style: TextStyle(color: Theme.of(context).primaryColor),
                     ),
                   ),
                 ],

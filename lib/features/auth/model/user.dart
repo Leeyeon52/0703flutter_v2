@@ -1,43 +1,47 @@
-// C:\Users\sptzk\Desktop\t0703\lib\features\auth\model\user.dart
+// lib/features/auth/model/user.dart
 
 class User {
-  final String userId;
+  final String uid;
+  final String email; // 로그인 아이디로 사용되는 이메일
   final String name;
-  final String gender;
-  final String birth;
-  final String phone;
-  final String address; // Flask에서 address 필드도 반환하므로 추가
+  final bool isDoctor;
+  final String? gender; // 추가: 성별
+  final String? birth;  // 추가: 생년월일 (예: "YYYY-MM-DD")
+  final String? phone;  // 추가: 전화번호
 
   User({
-    required this.userId,
+    required this.uid,
+    required this.email,
     required this.name,
-    required this.gender,
-    required this.birth,
-    required this.phone,
-    this.address = '', // 기본값 설정
+    this.isDoctor = false,
+    this.gender,
+    this.birth,
+    this.phone,
   });
 
-  // JSON 데이터로부터 User 객체를 생성하는 팩토리 생성자
+  // JSON 또는 Map에서 User 객체를 생성하는 팩토리 생성자
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
-      userId: json['user_id'] as String,
+      uid: json['uid'] as String,
+      email: json['email'] as String,
       name: json['name'] as String,
-      gender: json['gender'] as String,
-      birth: json['birth'] as String,
-      phone: json['phone'] as String,
-      address: json['address'] as String? ?? '', // null 처리 추가
+      isDoctor: json['is_doctor'] as bool? ?? false, // ⭐ 'is_doctor'로 변경
+      gender: json['gender'] as String?,
+      birth: json['birth'] as String?,
+      phone: json['phone'] as String?,
     );
   }
 
-  // User 객체를 JSON으로 변환하는 메서드 (필요시)
+  // User 객체를 JSON 또는 Map으로 변환하는 메서드
   Map<String, dynamic> toJson() {
     return {
-      'user_id': userId,
+      'uid': uid,
+      'email': email,
       'name': name,
+      'is_doctor': isDoctor, // ⭐ 'is_doctor'로 변경
       'gender': gender,
       'birth': birth,
       'phone': phone,
-      'address': address,
     };
   }
 }
