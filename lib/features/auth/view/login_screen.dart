@@ -97,10 +97,16 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('로그인'),
+        title: const Text(
+          '로그인',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+        ), // 기존 텍스트 유지
+        centerTitle: true, // 중앙 정렬 유지
+        backgroundColor: Colors.white, // 배경색 유지
+        elevation: 0.5, // 그림자 유지
       ),
       body: Container(
-        color: Theme.of(context).scaffoldBackgroundColor,
+        color: Theme.of(context).scaffoldBackgroundColor, // 기존 배경색 유지
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
@@ -111,13 +117,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    Icons.lock_open_rounded,
+                    Icons.lock_open_rounded, // 아이콘 유지
                     size: 80,
                     color: Theme.of(context).primaryColor,
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    '환영합니다!',
+                    '환영합니다!', // 텍스트 유지
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                           color: Colors.black87,
                           fontWeight: FontWeight.bold,
@@ -164,8 +170,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
+                  // ⭐ 이 부분의 onPressed 경로를 수정했습니다.
                   TextButton(
-                    onPressed: () => context.go('/register'),
+                    onPressed: () => context.go('/doctor_register'), // <-- 여기를 수정!
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
                       shape: RoundedRectangleBorder(
@@ -174,7 +181,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     child: Text(
-                      '회원가입',
+                      '의료진 회원가입', // 문구도 명확하게 변경하는 것을 권장합니다.
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             color: Colors.black54,
                             fontWeight: FontWeight.w600,

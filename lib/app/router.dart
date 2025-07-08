@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 
 // Views
 import 'package:t0703/features/auth/view/login_screen.dart';
-import 'package:t0703/features/auth/view/register_screen.dart';
+import 'package:t0703/features/auth/view/doctor_register_screen.dart';
 import 'package:t0703/features/auth/view/find-Account_screen.dart';
 import 'package:t0703/features/home/view/home_screen.dart'; // 환자 홈 화면
 import 'package:t0703/features/doctor_portal/view/doctor_dashboard_screen.dart'; // 의료진 대시보드
@@ -22,8 +22,8 @@ class AppRouter {
         builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
-        path: '/register',
-        builder: (context, state) => const RegisterScreen(),
+        path: '/doctor_register',
+        builder: (context, state) => const DoctorRegisterScreen(),
       ),
       GoRoute(
         path: '/find-account',

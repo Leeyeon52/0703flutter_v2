@@ -1,25 +1,24 @@
-// lib/features/auth/view/register_screen.dart
+// lib/features/auth/view/doctor_register_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:t0703/features/auth/viewmodel/auth_viewmodel.dart';
-// import 'package:t0703/features/auth/model/user.dart'; // User 모델은 ViewModel에서 처리하므로 여기서는 필요 없음
 
-class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({super.key});
+class DoctorRegisterScreen extends StatefulWidget {
+  const DoctorRegisterScreen({super.key});
 
   @override
-  State<RegisterScreen> createState() => _RegisterScreenState();
+  State<DoctorRegisterScreen> createState() => _DoctorRegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> {
+class _DoctorRegisterScreenState extends State<DoctorRegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _nameController = TextEditingController();
-  bool _isDoctor = false; // 기본값은 환자
+  final bool _isDoctor = true; // 의료진 전용이므로 기본값은 true로 고정
   String? _selectedGender;
   final _birthController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -59,6 +58,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
+    // 성별이 선택되었는지 추가 확인
+    if (_selectedGender == null) {
+      _showSnack('성별을 선택해주세요.');
+      return;
+    }
+
     final authViewModel = context.read<AuthViewModel>();
 
     try {
@@ -87,8 +92,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _passwordController.text.trim(),
         _nameController.text.trim(),
         _isDoctor,
-        // TODO: gender, birth, phone 필드는 현재 register 메서드에 없으므로 백엔드와 ViewModel 업데이트 필요
-        // 백엔드에서 해당 필드를 받도록 수정하고, ViewModel의 register 메서드에도 추가해야 합니다.
+        gender: _selectedGender,
+        birth: _birthController.text.trim(),
+        phone: _phoneController.text.trim(),
       );
 
       if (Navigator.of(context).canPop()) {
@@ -96,7 +102,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
 
       if (error == null) {
-        _showSnack('회원가입 성공!');
+        _showSnack('의료진 계정 회원가입 성공!');
         context.go('/login'); // 회원가입 성공 시 로그인 화면으로 이동
       } else {
         _showSnack('회원가입 실패: $error');
@@ -109,12 +115,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  // 생년월일 입력 시 하이픈을 자동으로 추가하는 함수
+  void _formatDate(String text) {
+    String cleanedText = text.replaceAll('-', ''); // 기존 하이픈 제거
+    String formattedText = '';
+
+    if (cleanedText.length > 8) {
+      cleanedText = cleanedText.substring(0, 8); // 8자리까지만 허용 (YYYYMMDD)
+    }
+
+    if (cleanedText.length > 4) {
+      formattedText += cleanedText.substring(0, 4);
+      formattedText += '-';
+      cleanedText = cleanedText.substring(4);
+    }
+    if (cleanedText.length > 2) {
+      formattedText += cleanedText.substring(0, 2);
+      formattedText += '-';
+      cleanedText = cleanedText.substring(2);
+    }
+    formattedText += cleanedText;
+
+    // 커서 위치 조정
+    final int newSelectionStart = formattedText.length;
+    _birthController.value = TextEditingValue(
+      text: formattedText,
+      selection: TextSelection.collapsed(offset: newSelectionStart),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          '회원가입',
+          '의료진 회원가입',
           style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
         ),
         centerTitle: true,
@@ -133,13 +168,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    Icons.person_add_alt,
+                    Icons.local_hospital_outlined,
                     size: 80,
                     color: Theme.of(context).primaryColor,
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    '새 계정 생성',
+                    '의료진 계정 생성',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                           color: Colors.black87,
                           fontWeight: FontWeight.bold,
@@ -241,16 +276,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const SizedBox(height: 20),
                   TextFormField(
                     controller: _birthController,
-                    keyboardType: TextInputType.datetime,
+                    keyboardType: TextInputType.number, // 숫자 키보드 사용
                     decoration: const InputDecoration(
                       labelText: '생년월일 (YYYY-MM-DD)',
                       hintText: 'YYYY-MM-DD',
                       prefixIcon: Icon(Icons.calendar_today_outlined),
                     ),
+                    onChanged: _formatDate, // 추가된 부분
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return '생년월일을 입력해주세요.';
                       }
+                      // 하이픈이 자동으로 추가되므로 10자리를 확인
                       if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value)) {
                         return '유효한 날짜 형식(YYYY-MM-DD)을 입력해주세요.';
                       }
@@ -272,20 +309,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       }
                       return null;
                     },
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Checkbox(
-                        value: _isDoctor,
-                        onChanged: (bool? value) {
-                          setState(() {
-                            _isDoctor = value ?? false;
-                          });
-                        },
-                      ),
-                      const Text('의료진으로 가입'),
-                    ],
                   ),
                   const SizedBox(height: 30),
                   SizedBox(

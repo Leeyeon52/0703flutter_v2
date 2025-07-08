@@ -69,7 +69,16 @@ class AuthViewModel extends ChangeNotifier {
   }
 
   // 사용자 회원가입
-  Future<String?> register(String email, String password, String name, bool isDoctor) async {
+  // gender, birth, phone 파라미터를 추가했습니다.
+  Future<String?> register(
+    String email,
+    String password,
+    String name,
+    bool isDoctor, {
+    String? gender, // <--- 추가된 파라미터
+    String? birth,  // <--- 추가된 파라미터
+    String? phone,  // <--- 추가된 파라미터
+  }) async {
     _setLoading(true);
     _setErrorMessage(null);
 
@@ -81,7 +90,10 @@ class AuthViewModel extends ChangeNotifier {
           'email': email,
           'password': password,
           'name': name,
-          'is_doctor': isDoctor, // 백엔드와 일치하도록 'is_doctor' 사용
+          'is_doctor': isDoctor,
+          'gender': gender, // <--- 백엔드로 전송할 데이터에 추가
+          'birth': birth,   // <--- 백엔드로 전송할 데이터에 추가
+          'phone': phone,   // <--- 백엔드로 전송할 데이터에 추가
         }),
       );
 
